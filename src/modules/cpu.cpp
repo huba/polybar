@@ -22,8 +22,10 @@ namespace modules {
 		m_totalcritical = m_conf.get(name(), "critical-percentage", 90.0f);
 
     m_formatter->add(DEFAULT_FORMAT, TAG_LABEL, {TAG_LABEL, TAG_BAR_LOAD, TAG_RAMP_LOAD, TAG_RAMP_LOAD_PER_CORE});
-    m_formatter->add(FORMAT_WARN, TAG_LABEL, {TAG_LABEL, TAG_BAR_LOAD, TAG_RAMP_LOAD, TAG_RAMP_LOAD_PER_CORE});
-    m_formatter->add(FORMAT_CRITICAL, TAG_LABEL, {TAG_LABEL, TAG_BAR_LOAD, TAG_RAMP_LOAD, TAG_RAMP_LOAD_PER_CORE});
+
+		string fallback_value = m_formatter->get(DEFAULT_FORMAT)->value;
+    m_formatter->add(FORMAT_WARN, fallback_value, {TAG_LABEL, TAG_BAR_LOAD, TAG_RAMP_LOAD, TAG_RAMP_LOAD_PER_CORE});
+    m_formatter->add(FORMAT_CRITICAL, fallback_value, {TAG_LABEL, TAG_BAR_LOAD, TAG_RAMP_LOAD, TAG_RAMP_LOAD_PER_CORE});
 
     // warmup cpu times
     read_values();
