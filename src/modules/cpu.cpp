@@ -24,8 +24,8 @@ namespace modules {
     m_formatter->add(DEFAULT_FORMAT, TAG_LABEL, {TAG_LABEL, TAG_BAR_LOAD, TAG_RAMP_LOAD, TAG_RAMP_LOAD_PER_CORE});
 
 		string fallback_value = m_formatter->get(DEFAULT_FORMAT)->value;
-    m_formatter->add(FORMAT_WARN, fallback_value, {TAG_LABEL, TAG_BAR_LOAD, TAG_RAMP_LOAD, TAG_RAMP_LOAD_PER_CORE});
-    m_formatter->add(FORMAT_CRITICAL, fallback_value, {TAG_LABEL, TAG_BAR_LOAD, TAG_RAMP_LOAD, TAG_RAMP_LOAD_PER_CORE});
+    m_formatter->add(FORMAT_WARN, fallback_value, {TAG_LABEL, TAG_WARN_LABEL, TAG_BAR_LOAD, TAG_RAMP_LOAD, TAG_RAMP_LOAD_PER_CORE});
+    m_formatter->add(FORMAT_CRITICAL, fallback_value, {TAG_LABEL, TAG_CRIT_LABEL, TAG_BAR_LOAD, TAG_RAMP_LOAD, TAG_RAMP_LOAD_PER_CORE});
 
     // warmup cpu times
     read_values();
@@ -41,19 +41,33 @@ namespace modules {
       m_rampload_core = load_ramp(m_conf, name(), TAG_RAMP_LOAD_PER_CORE);
     }
     if (m_formatter->has(TAG_LABEL)) {
-      // Update the label parameter and replace the %percentag-cores% token with the individual core tokens
-      string key{&TAG_LABEL[1], strlen(TAG_LABEL) - 2};
-      auto label = m_conf.get<string>(name(), key, "%percentage%%");
-      vector<string> cores;
-      for (size_t i = 1; i <= m_cputimes.size(); i++) {
-        cores.emplace_back("%percentage-core" + to_string(i) + "%%");
-      }
-      label = string_util::replace_all(label, "%percentage-cores%", string_util::join(cores, " "));
-      const_cast<config&>(m_conf).set(name(), key, move(label));
-
-      m_label = load_optional_label(m_conf, name(), TAG_LABEL, "%percentage%%");
+			prepare_label(cpu_state::NORMAL, TAG_LABEL);
+    }
+    if (m_formatter->has(TAG_WARN_LABEL)) {
+			prepare_label(cpu_state::WARN, TAG_WARN_LABEL);
+    }
+    if (m_formatter->has(TAG_CRIT_LABEL)) {
+			prepare_label(cpu_state::CRIT, TAG_CRIT_LABEL);
     }
   }
+
+	void cpu_module::prepare_label(cpu_state state, const string& tag) {
+		// Update the label parameter and replace the %percentag-cores% token with the individual core tokens
+		string key{&tag[1], tag.length() - 2};
+		auto raw_label = m_conf.get<string>(name(), key, "%percentage%%");
+		vector<string> cores;
+		for (size_t i = 1; i <= m_cputimes.size(); i++) {
+			cores.emplace_back("%percentage-core" + to_string(i) + "%%");
+		}
+		raw_label = string_util::replace_all(raw_label, "%percentage-cores%", string_util::join(cores, " "));
+		const_cast<config&>(m_conf).set(name(), key, move(raw_label));
+
+		label_t label = load_optional_label(m_conf, name(), tag, "%percentage%%");
+
+		if (label) {
+			m_labels[state] = label;
+		}
+	}
 
   bool cpu_module::update() {
     if (!read_values()) {
@@ -74,21 +88,25 @@ namespace modules {
       m_total += load;
       m_load.emplace_back(load);
 
-      if (m_label) {
-        percentage_cores.emplace_back(to_string(static_cast<int>(load + 0.5)));
+      if (!m_labels.empty()) {
+				percentage_cores.emplace_back(to_string(static_cast<int>(load + 0.5)));
       }
     }
 
     m_total = m_total / static_cast<float>(cores_n);
 
-    if (m_label) {
-      m_label->reset_tokens();
-      m_label->replace_token("%percentage%", to_string(static_cast<int>(m_total + 0.5)));
+		for (auto& pair: m_labels) {
+			label_t label = pair.second;
+			if (label) {
+				label->reset_tokens();
+				label->replace_token("%percentage%", to_string(static_cast<int>(m_total + 0.5)));
 
-      for (size_t i = 0; i < percentage_cores.size(); i++) {
-        m_label->replace_token("%percentage-core" + to_string(i + 1) + "%", percentage_cores[i]);
-      }
-    }
+				for (size_t i = 0; i < percentage_cores.size(); i++) {
+					label->replace_token("%percentage-core" + to_string(i + 1) + "%", percentage_cores[i]);
+				}
+ 
+			}
+		}
 
     return true;
   }
@@ -105,7 +123,11 @@ namespace modules {
 
   bool cpu_module::build(builder* builder, const string& tag) const {
     if (tag == TAG_LABEL) {
-      builder->node(m_label);
+      builder->node(m_labels.at(cpu_state::NORMAL));
+		} else if (tag == TAG_WARN_LABEL) {
+      builder->node(m_labels.at(cpu_state::WARN));
+		} else if (tag == TAG_CRIT_LABEL) {
+      builder->node(m_labels.at(cpu_state::CRIT));
     } else if (tag == TAG_BAR_LOAD) {
       builder->node(m_barload->output(m_total));
     } else if (tag == TAG_RAMP_LOAD) {

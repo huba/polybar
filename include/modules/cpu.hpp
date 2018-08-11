@@ -16,6 +16,8 @@ namespace modules {
 
   using cpu_time_t = unique_ptr<cpu_time>;
 
+	enum class cpu_state { NORMAL = 0, WARN, CRIT };
+
   class cpu_module : public timer_module<cpu_module> {
    public:
     explicit cpu_module(const bar_settings&, string);
@@ -27,9 +29,12 @@ namespace modules {
    protected:
     bool read_values();
     float get_load(size_t core) const;
+		void prepare_label(cpu_state state, const string& tag);
 
    private:
     static constexpr auto TAG_LABEL = "<label>";
+		static constexpr auto TAG_WARN_LABEL = "<warn-label>";
+		static constexpr auto TAG_CRIT_LABEL = "<critical-label>";
     static constexpr auto TAG_BAR_LOAD = "<bar-load>";
     static constexpr auto TAG_RAMP_LOAD = "<ramp-load>";
     static constexpr auto TAG_RAMP_LOAD_PER_CORE = "<ramp-coreload>";
@@ -39,7 +44,7 @@ namespace modules {
     progressbar_t m_barload;
     ramp_t m_rampload;
     ramp_t m_rampload_core;
-    label_t m_label;
+		map<cpu_state, label_t> m_labels;
 
 		float m_totalwarn = 0.0f;
 		float m_totalcritical = 0.0f;
