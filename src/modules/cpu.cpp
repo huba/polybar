@@ -18,7 +18,12 @@ namespace modules {
   cpu_module::cpu_module(const bar_settings& bar, string name_) : timer_module<cpu_module>(bar, move(name_)) {
     m_interval = m_conf.get<decltype(m_interval)>(name(), "interval", 1s);
 
+		m_totalwarn = m_conf.get(name(), "warn-percentage", 70.0f);
+		m_totalcritical = m_conf.get(name(), "critical-percentage", 90.0f);
+
     m_formatter->add(DEFAULT_FORMAT, TAG_LABEL, {TAG_LABEL, TAG_BAR_LOAD, TAG_RAMP_LOAD, TAG_RAMP_LOAD_PER_CORE});
+    m_formatter->add(FORMAT_WARN, TAG_LABEL, {TAG_LABEL, TAG_BAR_LOAD, TAG_RAMP_LOAD, TAG_RAMP_LOAD_PER_CORE});
+    m_formatter->add(FORMAT_CRITICAL, TAG_LABEL, {TAG_LABEL, TAG_BAR_LOAD, TAG_RAMP_LOAD, TAG_RAMP_LOAD_PER_CORE});
 
     // warmup cpu times
     read_values();
@@ -85,6 +90,16 @@ namespace modules {
 
     return true;
   }
+
+	string cpu_module::get_format() const {
+		if (m_total > m_totalcritical) {
+			return FORMAT_CRITICAL;
+		} else if (m_total > m_totalwarn) {
+			return FORMAT_WARN;
+		} else {
+			return DEFAULT_FORMAT;
+		}
+	}
 
   bool cpu_module::build(builder* builder, const string& tag) const {
     if (tag == TAG_LABEL) {

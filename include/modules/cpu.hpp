@@ -21,6 +21,7 @@ namespace modules {
     explicit cpu_module(const bar_settings&, string);
 
     bool update();
+		string get_format() const;
     bool build(builder* builder, const string& tag) const;
 
    protected:
@@ -32,11 +33,16 @@ namespace modules {
     static constexpr auto TAG_BAR_LOAD = "<bar-load>";
     static constexpr auto TAG_RAMP_LOAD = "<ramp-load>";
     static constexpr auto TAG_RAMP_LOAD_PER_CORE = "<ramp-coreload>";
+		static constexpr auto FORMAT_WARN = "format-warn";
+		static constexpr auto FORMAT_CRITICAL = "format-critical";
 
     progressbar_t m_barload;
     ramp_t m_rampload;
     ramp_t m_rampload_core;
     label_t m_label;
+
+		float m_totalwarn = 0.0f;
+		float m_totalcritical = 0.0f;
 
     vector<cpu_time_t> m_cputimes;
     vector<cpu_time_t> m_cputimes_prev;
